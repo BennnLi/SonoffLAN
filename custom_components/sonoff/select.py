@@ -1,3 +1,6 @@
+import math
+from typing import Optional
+
 from homeassistant.components.select import SelectEntity
 
 from .core.const import DOMAIN
@@ -13,6 +16,97 @@ async def async_setup_entry(hass, config_entry, add_entities):
         SIGNAL_ADD_ENTITIES,
         lambda x: add_entities([e for e in x if isinstance(e, SelectEntity)]),
     )
+
+class XSelectAutoGenerateOptions(XEntity, SelectEntity):
+    _attr_options = []
+    _correction_range: tuple[int | float] | None = None
+    _correction_step: int | float | None = None
+
+    def __init__(self, ewelink, device):
+        super().__init__(ewelink, device)
+        self._attr_options = self._generate_options()
+
+    def _generate_options(self) -> list:
+        if self._correction_range is None or self._correction_step is None:
+            return
+
+        min_val, max_val = self._correction_range
+        if max_val <= min_val:
+            return []
+
+        if self._correction_step <= 0:
+            return []
+
+        options_count = math.floor((max_val - min_val) / self._correction_step) + 1
+        options = []
+        for i in range(options_count):
+            option_value = min_val + (self._correction_step * i)
+            formatted_value = round(option_value, 1)
+            options.append(str(formatted_value))
+
+        return options
+
+
+class XSelectTRVTemperatureCorrection(XSelectAutoGenerateOptions):
+    params = {"tempCorrection"}
+    _correction_range = (-7, 7)
+    _correction_step = 0.2
+
+    def set_state(self, params: dict) -> Optional[str]:
+        if not isinstance(params, dict):
+            return None
+
+        value = params.get(self.param)
+        if not isinstance(value, (int, float)):
+            return None
+
+        try:
+            corrected_value = 0.0 if value == 0 else round(value / 10.0, 1)
+            self._attr_current_option = str(corrected_value)
+        except (ValueError, ZeroDivisionError):
+            return None
+
+    async def async_select_option(self, option: str) -> None:
+        try:
+            if not option or not isinstance(option, str):
+                return
+            temp_correction = int(float(option) * 10)
+            await self.ewelink.send(self.device, {self.param: temp_correction})
+        except Exception:
+            pass
+
+
+class XSelectTRVEcoTargetTemperature(XSelectAutoGenerateOptions):
+    params = {"ecoTargetTemp"}
+    _correction_range = (4, 35)
+    _correction_step = 0.5
+
+    def __int__(self, ewelink, device):
+        super().__init__(ewelink, device)
+
+    def set_state(self, params: dict):
+        if not isinstance(params, dict):
+            return None
+
+        value = params.get(self.param)
+        if not isinstance(value, (int, float)):
+            return None
+
+        try:
+            corrected_value = 0.0 if value == 0 else round(value / 10.0, 1)
+            self._attr_current_option = str(corrected_value)
+            return
+        except (ValueError, ZeroDivisionError):
+            return None
+
+    async def async_select_option(self, option: str):
+        try:
+            if not option or not isinstance(option, str):
+                return
+            eco_target_temp = int(float(option) * 10)
+            await self.ewelink.send(self.device, {self.param: eco_target_temp})
+        except Exception:
+            pass
 
 
 class XSelectStartup(XEntity, SelectEntity):

@@ -1,4 +1,6 @@
-from homeassistant.components.number import NumberEntity
+from homeassistant.helpers.entity import EntityCategory
+from homeassistant.components.number import NumberEntity, NumberDeviceClass
+from homeassistant.const import UnitOfTime
 
 from .core.const import DOMAIN
 from .core.entity import XEntity
@@ -65,3 +67,23 @@ class XSensitivity(XNumber):
     _attr_entity_registry_enabled_default = False
     _attr_native_max_value = 3
     _attr_native_min_value = 1
+
+
+class XTRVBoostDuration(XNumber):
+    param = 'boostDuration'
+
+    _attr_device_class = NumberDeviceClass.DURATION
+    _attr_native_max_value = 24 * 60
+    _attr_native_min_value = 1
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def set_state(self, params: dict):
+        value = params[self.param]
+        if not value or not isinstance(value, (int, float)):
+            return
+        self._attr_native_value = int(value / 60)
+
+    async def async_set_native_value(self, value):
+        await self.ewelink.send(self.device, {"boostDuration": int(value * 60)})

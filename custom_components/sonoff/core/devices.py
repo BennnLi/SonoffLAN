@@ -50,9 +50,9 @@ from ..light import (
     XZigbeeLight,
 )
 from ..media_player import XPanelBuzzer
-from ..number import XPulseWidth, XSensitivity
+from ..number import XPulseWidth, XSensitivity, XTRVBoostDuration
 from ..remote import XRemote
-from ..select import XSelectStartup
+from ..select import XSelectStartup, XSelectTRVTemperatureCorrection, XSelectTRVEcoTargetTemperature
 from ..sensor import (
     XEnergySensor,
     XEnergySensorDualR3,
@@ -603,22 +603,13 @@ DEVICES = {
             multiply=0.1,
             uid="current_target_temperature",
         ),
-        spec(
-            XSensor,
-            param="ecoTargetTemp",
-            multiply=0.1,
-            uid="eco_target_temperature",
-        ),
-        spec(
-            XSensor,
-            param="tempCorrection",
-            multiply=0.1,
-            uid="temperature_correction",
-        ),
+        spec(XSelectTRVEcoTargetTemperature, param="ecoTargetTemp", uid="eco_target_temp"),
+        spec(XSelectTRVTemperatureCorrection, param="tempCorrection", uid="temperature_correction"),
         spec(XBoolSwitch, param="childLock", uid="child_lock"),
         spec(XBoolSwitch, param="windowSwitch", uid="window_switch"),
         spec(XHexVoltageTRVZB, param="runVoltage", uid="run_voltage"),
         spec(XHexVoltageTRVZB, param="limitVoltage", uid="limit_voltage"),
+        XTRVBoostDuration,
         Battery,
         ZRSSI,
     ],

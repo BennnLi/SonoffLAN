@@ -1,7 +1,11 @@
+from time import time
+
 from homeassistant.components.climate import ClimateEntity
 from homeassistant.components.climate.const import (
     ClimateEntityFeature,
     HVACMode,
+    PRESET_BOOST,
+    PRESET_NONE
 )
 from homeassistant.const import MAJOR_VERSION, MINOR_VERSION, UnitOfTemperature
 
@@ -335,6 +339,7 @@ class XThermostatTRVZB(XEntity, ClimateEntity):
     _attr_min_temp = 4
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_target_temperature_step = 0.5
+    _attr_preset_mode = PRESET_NONE
 
     # https://developers.home-assistant.io/blog/2024/01/24/climate-climateentityfeatures-expanded
     if (MAJOR_VERSION, MINOR_VERSION) >= (2024, 2):
@@ -342,8 +347,10 @@ class XThermostatTRVZB(XEntity, ClimateEntity):
             ClimateEntityFeature.TARGET_TEMPERATURE
             | ClimateEntityFeature.TURN_ON
             | ClimateEntityFeature.TURN_OFF
+            | ClimateEntityFeature.PRESET_MODE
         )
         _enable_turn_on_off_backwards_compatibility = False
+        _attr_preset_modes = [PRESET_NONE, PRESET_BOOST]
     else:
         _attr_supported_features = (
             ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.PRESET_MODE
@@ -355,7 +362,13 @@ class XThermostatTRVZB(XEntity, ClimateEntity):
             cache.update(params)
 
         if "workMode" in cache:
-            self._attr_hvac_mode = self.hvac_modes[int(cache["workMode"])]
+            work_mode_num = int(cache["workMode"])
+            if work_mode_num < len(self.hvac_modes):
+                self._attr_hvac_mode = self.hvac_modes[work_mode_num]
+                self._attr_preset_mode = PRESET_NONE
+            elif work_mode_num == 3:
+                self._attr_hvac_mode = self.hvac_modes[0]
+                self._attr_preset_mode = PRESET_BOOST
 
         if "curTargetTemp" in cache:
             self._attr_target_temperature = cache["curTargetTemp"] * 0.1
@@ -370,11 +383,25 @@ class XThermostatTRVZB(XEntity, ClimateEntity):
         await self.async_set_temperature(preset_mode=preset_mode)
 
     async def async_set_temperature(
-        self, temperature: float = None, hvac_mode: HVACMode = None, **kwargs
+        self, temperature: float = None, hvac_mode: HVACMode = None, preset_mode: str = None,  **kwargs
     ) -> None:
         if hvac_mode is not None:
             params = {"workMode": str(self.hvac_modes.index(hvac_mode))}
             temp_key = TRVZB_PRESET_MODES.get(hvac_mode)
+        elif preset_mode is not None:
+            params = {}
+            if preset_mode == PRESET_NONE:
+                last_work_mode = self.device.get("params", {}).get("lastWorkMode", "0")
+                params = {"workMode": last_work_mode}
+            elif preset_mode == PRESET_BOOST:
+                boost_duration = self.device.get("params", {}).get("boostDuration", 300)
+                last_work_mode = self.device.get("params", {}).get("workMode", "0")
+                params = {
+                    "workMode": "3",
+                    "boostDuration": boost_duration,
+                    "workModeTime": int(round(time() * 1000)) + boost_duration * 1000,
+                    "lastWorkMode": last_work_mode
+                }
         else:
             params = {}
             temp_key = TRVZB_PRESET_MODES.get(self._attr_hvac_mode)
