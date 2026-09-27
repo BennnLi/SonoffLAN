@@ -85,6 +85,7 @@ from ..sensor import (
     XHexVoltageTRVZB,
     XHumCorrection,
     XHumidityTH,
+    XMiniR4Key,
     XOutdoorTempNS,
     XSensor,
     XSubSensor,
@@ -438,7 +439,7 @@ DEVICES = {
         LED,
         RSSI,
         spec(XIntSwitch, param="relaySeparation", uid="detach", enabled=False),
-        spec(XButtonKey, uid="action"),
+        XMiniR4Key,
     ],
     # DW2-Wi-Fi-L, https://github.com/AlexxIT/SonoffLAN/issues/808
     154: [XWiFiDoor, Battery, RSSI],
